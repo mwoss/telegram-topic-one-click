@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Telegram Topic One-Click",
+  "version": "0.1.0",
+  "description": "Replaces Telegram Web A's forum-topics sidebar with a mobile-style horizontal topic strip and auto-opens the most recent topic.",
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://web.telegram.org/a/*"],
+      "js": ["src/content.js"],
+      "css": ["src/overlay.css"],
+      "run_at": "document_start"
+    }
+  ]
+}

@@ -1,0 +1,219 @@
+/* Telegram Topic One-Click — overlay styles. */
+
+/* Hide Telegram's original ForumPanel while our strip is active.
+ * The element stays in the DOM so chip clicks can proxy to its anchors. */
+body.ttopic-active [data-ttopic-panel] {
+  display: none !important;
+}
+
+/* When the forum panel is open, Telegram fades the main chat list's text
+ * content out of the way (opacity: 0 + translateX(-60px) on every `.info`
+ * inside `.chat-list.forum-panel-open`) so the topic panel can sit on top.
+ *
+ * Once we hide the topic panel, that fade is no longer wanted — the chat
+ * list is fully visible again and should look exactly like it does for any
+ * non-forum chat (full names, last-message previews, badges). Without this
+ * override the chat list looks "wide and empty": rows are full-width but
+ * every row's text is invisible & shifted off-screen.
+ *
+ * !important is required to beat Telegram's CSS-Modules-scoped rules. */
+body.ttopic-active .chat-list.forum-panel-open .info {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* Match selected-forum highlight to the standard "selected chat" purple.
+ *
+ * Telegram applies `.selected` to the currently-open DM/channel/group, which
+ * triggers `--background-color: var(--color-chat-active)` (purple) on the
+ * row's button. For a forum group the corresponding class is
+ * `.selected-forum` instead — and the live build does NOT promote the
+ * background-color variable on it, on the assumption that the topic
+ * sidebar will cover that area anyway.
+ *
+ * We hide the sidebar, so the row sits there bare with the default dark
+ * background — visibly different from every other selected chat. Promote
+ * the variable here so forum group rows look identical to other chats
+ * when they're the active one.
+ *
+ * The second rule handles the topic-pills (`# General`, `Wyjścia`)
+ * Telegram renders inside the row's subtitle: those have their own
+ * `--first-column-background-color` defined on a hashed-class ancestor
+ * (`.Ow6Ij9O5` at the time of writing), which shadows any value we set
+ * on the row root. We re-set the variable on every descendant of
+ * `.subtitle` so it actually reaches the `.lEbV6HrI` pill node where
+ * the `background:` declaration consumes it. The `*` selector is broad
+ * but scoped to a single chat-list row's subtitle, so the impact is
+ * localized. */
+body.ttopic-active .ListItem.Chat.selected-forum {
+  --background-color: var(--color-chat-active) !important;
+  /* Promote the text-color CSS variables that Telegram normally flips
+   * to white on `.selected` rows but leaves at their dim defaults on
+   * `.selected-forum`. Without these:
+   *   - `.time` (top-right "21:01") stays gray (#8c8c91)
+   *   - `.last-message` preview stays light gray (#aaa)
+   *   - "You:" sender label stays accent purple
+   * which all look under-saturated and inconsistent on the purple
+   * highlighted row. With these set, the row matches what a selected
+   * DM looks like (everything white). */
+  --color-text-secondary: #ffffff !important;
+  --color-text-meta: #ffffff !important;
+  --color-text-meta-colored: #ffffff !important;
+}
+
+/* Keep the row purple on hover/keyboard-focus instead of flipping it
+ * back to the dark gray hover color. Telegram applies a `.focus` class
+ * on hover (`.ListItem.focus { --background-color: var(--color-chat-hover); }`),
+ * which without this override makes the selection appear to "drop"
+ * whenever the cursor moves over the row. */
+body.ttopic-active .ListItem.Chat.selected-forum.focus,
+body.ttopic-active .ListItem.Chat.selected-forum:hover {
+  --background-color: var(--color-chat-active) !important;
+}
+
+/* Hide the extra `::before` accent bar Telegram renders only on
+ * `.selected-forum` rows (a brighter-purple 5px×52px vertical bar
+ * positioned at the right edge of the chat-list column, where the
+ * topic panel would normally dock). Regular `.selected` DM/channel
+ * rows don't have one, so it shows up as an extra indicator that
+ * the row is "different" from any other selected chat. The purple
+ * row background already conveys "this is the active chat". */
+body.ttopic-active .ListItem.Chat.selected-forum::before {
+  content: none !important;
+}
+
+body.ttopic-active .ListItem.Chat.selected-forum .subtitle * {
+  --first-column-background-color: var(--color-chat-active) !important;
+}
+
+/* Keep the chat-list search bar visible while a forum panel is open.
+ *
+ * When forum-panel-open is set, Telegram applies `SearchInput--hidden`
+ * to the search input in `#LeftMainHeader`, which sets
+ * `pointer-events: none; opacity: 0;`. The native UI hides this input
+ * because the topic-panel header has its own search; with our extension
+ * that panel is hidden, so the search disappears entirely from the page.
+ *
+ * Restore it. We only need to override the two declarations above —
+ * the input keeps its layout slot in the header so opacity flips back
+ * to fully usable. */
+body.ttopic-active #LeftMainHeader .SearchInput--hidden {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* The horizontal topic strip lives directly after .MiddleHeader and is
+ * sticky so it stays visible while scrolling messages. */
+#ttopic-strip {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;            /* Firefox */
+
+  background: var(--color-background, #fff);
+  border-bottom: 1px solid var(--color-borders, rgba(0, 0, 0, 0.08));
+}
+
+#ttopic-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.ttopic-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+
+  height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-borders, rgba(0, 0, 0, 0.08));
+  border-radius: 1rem;
+
+  background: transparent;
+  color: var(--color-text, #222);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1;
+  cursor: pointer;
+
+  white-space: nowrap;
+  max-width: 16rem;
+  overflow: hidden;
+
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.ttopic-chip:hover {
+  background: var(--color-chat-hover, rgba(0, 0, 0, 0.04));
+}
+
+.ttopic-chip:focus-visible {
+  outline: 2px solid var(--color-primary, #259ce0);
+  outline-offset: 2px;
+}
+
+.ttopic-chip--active {
+  background: var(--color-primary, #259ce0);
+  border-color: var(--color-primary, #259ce0);
+  color: var(--color-white, #fff);
+}
+
+.ttopic-chip--active:hover {
+  /* Keep active chip stable on hover. */
+  background: var(--color-primary, #259ce0);
+}
+
+.ttopic-chip__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttopic-chip__badge {
+  flex: 0 0 auto;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.3125rem;
+  border-radius: 0.5625rem;
+  background: var(--color-gray, #a8a8a8);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+  text-align: center;
+}
+
+.ttopic-chip--active .ttopic-chip__badge {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Tighten things on narrow viewports. */
+@media (max-width: 600px) {
+  #ttopic-strip {
+    padding: 0.375rem 0.5rem;
+    gap: 0.375rem;
+  }
+
+  .ttopic-chip {
+    height: 1.75rem;
+    padding: 0 0.5rem;
+    font-size: 0.8125rem;
+    max-width: 12rem;
+  }
+}
