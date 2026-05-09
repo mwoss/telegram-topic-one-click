@@ -6,6 +6,8 @@ It fixes terrible multi click UX where you had minimum 2-3 clicks to before you 
 
 Targets only `web.telegram.org/a/*`. The K version (`/k/`) is not supported.
 
+![Topic strip rendered above the chat](docs/topic-bar.png)
+
 ## Install (development)
 
 1. Clone this repo.
