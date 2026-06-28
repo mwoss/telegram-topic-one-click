@@ -102,29 +102,73 @@ body.ttopic-active #LeftMainHeader .SearchInput--hidden {
   pointer-events: auto !important;
 }
 
-/* The horizontal topic strip lives directly after .MiddleHeader and is
- * sticky so it stays visible while scrolling messages. */
+/* The topic strip sits in-flow right after .MiddleHeader. Pinned-message
+ * panes (MiddleHeaderPanes) are repositioned below the strip via
+ * [data-ttopic-panes-host] — see content.js syncStripLayout(). */
 #ttopic-strip {
-  position: sticky;
-  top: 0;
-  z-index: 5;
+  position: relative;
+  z-index: var(--z-middle-header, 11);
+  flex-shrink: 0;
 
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
 
-  padding: 0.5rem 0.75rem;
-  margin: 0;
-  width: 100%;
   box-sizing: border-box;
+  width: calc(100% - var(--middle-panel-inline-padding, 1rem) * 2);
+  max-width: calc(var(--messages-container-width, 47.5rem) - var(--middle-panel-inline-padding, 1rem) * 2);
+  height: 3rem;
+  /* margin-top synced in content.js to match the 0.5rem header↔pane gap
+   * Telegram uses (see MiddleHeaderPanes.module.scss). */
+  margin: var(--ttopic-strip-margin-top, 0.5rem) auto 0.5rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  padding-right: max(0.5rem, env(safe-area-inset-right));
+  padding-left: max(0.5rem, env(safe-area-inset-left));
 
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;            /* Firefox */
 
+  /* Match .MiddleHeader / middle-header-pane (pinned bar) island shape. */
+  border-radius: 2rem;
   background: var(--color-background, #fff);
-  border-bottom: 1px solid var(--color-borders, rgba(0, 0, 0, 0.08));
+  box-shadow: var(--shadow-pane, 0 1px 5px -1px rgba(0, 0, 0, 0.21));
+}
+
+@media (min-width: 1276px) {
+  #Main.right-column-open #ttopic-strip {
+    width: calc(100% - var(--right-column-width, 26.5rem) - var(--middle-panel-inline-padding, 1rem) * 2);
+    transform: translate3d(calc(var(--right-column-width, 26.5rem) / -2), 0, 0);
+    transition: transform var(--layer-transition, 0.3s cubic-bezier(0.33, 1, 0.68, 1));
+  }
+}
+
+/* Order: chat header → topics → pinned panes. `--ttopic-strip-block-height`
+ * already includes the strip's bottom margin (the 0.5rem gap). */
+body.ttopic-active [data-ttopic-panes-host] {
+  top: calc(
+    var(--middle-header-height, 3rem)
+    + var(--middle-panel-inline-padding, 1rem)
+    + var(--ttopic-strip-block-height, 4rem)
+  ) !important;
+}
+
+/* Reserve in-flow space under the strip when pinned panes are open. */
+body.ttopic-active #ttopic-strip + .Transition {
+  margin-top: var(--ttopic-panes-flow-offset, 0px);
+}
+
+/* Panes no longer overlap the message list top — margin above handles it. */
+body.ttopic-active .first-message-date-group {
+  padding-top: 0 !important;
+}
+
+/* MessageList sits below our in-flow strip, which already clears header
+ * panes — sticky dates only need Telegram's base inset. */
+body.ttopic-active .MessageList.scrolled:not(.is-animating) .sticky-date {
+  top: 0.625rem !important;
 }
 
 #ttopic-strip::-webkit-scrollbar {
@@ -139,13 +183,15 @@ body.ttopic-active #LeftMainHeader .SearchInput--hidden {
 
   height: 2rem;
   padding: 0 0.75rem;
-  border: 1px solid var(--color-borders, rgba(0, 0, 0, 0.08));
-  border-radius: 1rem;
+  border: none;
+  /* Match HeaderPinnedMessage .pinnedMessage / .inlineButton pills. */
+  border-radius: 1.5rem;
 
   background: transparent;
   color: var(--color-text, #222);
   font: inherit;
   font-size: 0.875rem;
+  font-weight: var(--font-weight-medium, 500);
   line-height: 1;
   cursor: pointer;
 
@@ -154,29 +200,27 @@ body.ttopic-active #LeftMainHeader .SearchInput--hidden {
   overflow: hidden;
 
   transition:
-    background-color 0.12s ease,
-    color 0.12s ease,
-    border-color 0.12s ease;
+    background-color 0.15s ease-in-out,
+    color 0.12s ease;
 }
 
 .ttopic-chip:hover {
-  background: var(--color-chat-hover, rgba(0, 0, 0, 0.04));
+  background: var(--color-interactive-element-hover, rgba(0, 0, 0, 0.04));
 }
 
 .ttopic-chip:focus-visible {
-  outline: 2px solid var(--color-primary, #259ce0);
+  outline: 2px solid var(--color-primary, #3390ec);
   outline-offset: 2px;
 }
 
 .ttopic-chip--active {
-  background: var(--color-primary, #259ce0);
-  border-color: var(--color-primary, #259ce0);
+  background: var(--color-primary, #3390ec);
   color: var(--color-white, #fff);
 }
 
 .ttopic-chip--active:hover {
   /* Keep active chip stable on hover. */
-  background: var(--color-primary, #259ce0);
+  background: var(--color-primary, #3390ec);
 }
 
 .ttopic-chip__label {
@@ -206,14 +250,19 @@ body.ttopic-active #LeftMainHeader .SearchInput--hidden {
 /* Tighten things on narrow viewports. */
 @media (max-width: 600px) {
   #ttopic-strip {
-    padding: 0.375rem 0.5rem;
-    gap: 0.375rem;
+    width: auto;
+    max-width: none;
+    margin-left: max(0.5rem, env(safe-area-inset-left));
+    margin-right: max(0.5rem, env(safe-area-inset-right));
+    padding-right: max(0.25rem, env(safe-area-inset-right));
+    padding-left: max(0.25rem, env(safe-area-inset-left));
+    transform: none !important;
   }
 
   .ttopic-chip {
-    height: 1.75rem;
-    padding: 0 0.5rem;
-    font-size: 0.8125rem;
+    height: 2rem;
+    padding: 0 0.625rem;
+    font-size: 0.875rem;
     max-width: 12rem;
   }
 }

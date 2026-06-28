@@ -41,6 +41,11 @@
 //                                   topic strip is inserted immediately
 //                                   after it.
 //
+//   * MiddleHeaderPanes            — sibling rendered *before* MiddleHeader
+//                                   inside `.messages-layout`. Holds pinned
+//                                   messages, audio player, etc. We reposition
+//                                   it below `#ttopic-strip` via CSS when active.
+//
 // Selectors below intentionally avoid CSS-Modules hashed classes (those
 // look like `lrlHKC_D` / `Foo_bar_xyz12`). The ForumPanel root in the live
 // build is currently `<div class="lrlHKC_D">` but we find it by walking up
@@ -61,6 +66,9 @@
   // is viewing Telegram's "all messages" combined feed for this forum.
   const ALL_THREAD_ID = '__all__';
   const LOG_PREFIX = '[ttopic]';
+  // Same 0.5rem gap Telegram uses between MiddleHeader and MiddleHeaderPanes
+  // (MiddleHeaderPanes `top` calc and PANE_GAP_REM in useHeaderPane).
+  const HEADER_PANE_GAP_REM = 0.5;
 
   // --- Tiny utilities -----------------------------------------------------
 
@@ -248,6 +256,103 @@
   // --- Strip rendering ----------------------------------------------------
 
   let lastSignature = '';
+  let stripResizeObserver = null;
+  let middleColumnObserver = null;
+  let observedStrip = null;
+
+  function remPx() {
+    return HEADER_PANE_GAP_REM * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16);
+  }
+
+  function parseCssPx(value) {
+    const n = parseFloat(String(value).trim());
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  /**
+   * Layout order: chat header → topic strip → pinned panes → messages.
+   * Strip keeps the 0.5rem header gap; panes are pushed down by CSS.
+   */
+  function findHeaderPanesHost(header) {
+    const node = header?.previousElementSibling;
+    if (!node || node.id === STRIP_ID || node.classList.contains('MiddleHeader')) {
+      return null;
+    }
+    return node;
+  }
+
+  function syncStripLayout(strip) {
+    const middleColumn = document.getElementById('MiddleColumn');
+    if (!middleColumn) return;
+
+    const header = document.querySelector('.MiddleHeader');
+    const panesHost = findHeaderPanesHost(header);
+
+    if (!strip?.isConnected) {
+      strip?.style.removeProperty('--ttopic-strip-margin-top');
+      middleColumn.style.removeProperty('--ttopic-strip-block-height');
+      middleColumn.style.removeProperty('--ttopic-panes-flow-offset');
+      panesHost?.removeAttribute('data-ttopic-panes-host');
+      return;
+    }
+
+    const gapPx = remPx();
+    const panesPx = parseCssPx(
+      getComputedStyle(middleColumn).getPropertyValue('--middle-header-panes-height'),
+    );
+
+    strip.style.setProperty('--ttopic-strip-margin-top', `${gapPx}px`);
+
+    const stripStyle = getComputedStyle(strip);
+    const blockHeight =
+      parseCssPx(stripStyle.marginTop) + strip.offsetHeight + parseCssPx(stripStyle.marginBottom);
+    middleColumn.style.setProperty('--ttopic-strip-block-height', `${blockHeight}px`);
+
+    middleColumn.style.setProperty(
+      '--ttopic-panes-flow-offset',
+      `${panesPx > 0 ? panesPx + gapPx : 0}px`,
+    );
+
+    if (panesHost) panesHost.setAttribute('data-ttopic-panes-host', '1');
+  }
+
+  function observeStripLayout(strip) {
+    syncStripLayout(strip);
+    if (observedStrip === strip && stripResizeObserver && middleColumnObserver) return;
+
+    if (stripResizeObserver) stripResizeObserver.disconnect();
+    observedStrip = strip;
+    stripResizeObserver = new ResizeObserver(() => syncStripLayout(strip));
+    stripResizeObserver.observe(strip);
+
+    const middleColumn = document.getElementById('MiddleColumn');
+    if (middleColumnObserver) middleColumnObserver.disconnect();
+    middleColumnObserver = null;
+    if (middleColumn) {
+      middleColumnObserver = new MutationObserver(() => syncStripLayout(strip));
+      middleColumnObserver.observe(middleColumn, {
+        attributes: true,
+        attributeFilter: ['style'],
+      });
+    }
+  }
+
+  function clearStripLayout() {
+    if (stripResizeObserver) {
+      stripResizeObserver.disconnect();
+      stripResizeObserver = null;
+    }
+    if (middleColumnObserver) {
+      middleColumnObserver.disconnect();
+      middleColumnObserver = null;
+    }
+    observedStrip = null;
+    document.getElementById(STRIP_ID)?.style.removeProperty('--ttopic-strip-margin-top');
+    const middleColumn = document.getElementById('MiddleColumn');
+    middleColumn?.style.removeProperty('--ttopic-strip-block-height');
+    middleColumn?.style.removeProperty('--ttopic-panes-flow-offset');
+    document.querySelector('[data-ttopic-panes-host]')?.removeAttribute('data-ttopic-panes-host');
+  }
 
   function ensureStrip() {
     let strip = document.getElementById(STRIP_ID);
@@ -261,13 +366,17 @@
 
   function attachStrip(strip) {
     const header = document.querySelector('.MiddleHeader');
-    if (!header) {
+    const layout = header?.closest('.messages-layout');
+    if (!header || !layout) {
       strip.remove();
       return false;
     }
-    if (strip.previousElementSibling !== header) {
+    // Keep the strip in `.messages-layout` directly after `.MiddleHeader`
+    // (before MessageList). MiddleHeaderPanes is an earlier absolute sibling.
+    if (strip.parentElement !== layout || strip.previousElementSibling !== header) {
       header.insertAdjacentElement('afterend', strip);
     }
+    observeStripLayout(strip);
     return true;
   }
 
@@ -419,6 +528,7 @@
   function teardown() {
     const strip = document.getElementById(STRIP_ID);
     if (strip) strip.remove();
+    clearStripLayout();
     lastSignature = '';
   }
 
