@@ -11,8 +11,8 @@ structural heuristics.
 
 | Selector | Where | Use |
 | --- | --- | --- |
-| `.MiddleHeader` | Middle column chat header | Anchor for the topic strip — we insert `#ttopic-strip` immediately after it inside `.messages-layout`. |
-| `MiddleHeaderPanes` | First child of `.messages-layout` (CSS-module root, hashed class) | Absolutely positioned bar for pinned messages, audio player, etc. Marked `[data-ttopic-panes-host]` and repositioned **below** `#ttopic-strip` while the extension is active. Sets `--middle-header-panes-height` on `#MiddleColumn`. |
+| `.MiddleHeader` | Middle column chat header (`position: absolute` since WebA #7059) | Anchor for the topic strip — we insert `#ttopic-strip` immediately after it inside `.messages-layout` and stack the strip below this island. |
+| `MiddleHeaderPanesIsland` | Sibling **after** `.MiddleHeader` (CSS-module root, hashed class) | Absolutely positioned bar for pinned messages, etc. Marked `[data-ttopic-panes-host]` and repositioned **below** `#ttopic-strip`. Sets `--middle-header-panes-height` on `#MiddleColumn`. |
 | `.ListItem` / `.ListItem-button` | Every list row (chats, topics, menu items) | `.ListItem-button` is the inner clickable element. It's `<a>` when the row has an `href`, else `<div>`. On the live build, all chat / topic rows are `<a>`. |
 | `.chat-list` | Scrollable list container | Used both by the main chat list and the forum panel's own chat-list. They are *separate* elements in the DOM. |
 | `.fullName` | Chat / Topic entries | Holds the title text (`<h3 class="fullName">`). |

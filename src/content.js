@@ -37,14 +37,15 @@
 //                                   one; the panel one has just
 //                                   `chat-list custom-scroll`.
 //
-//   * .MiddleHeader               — chat header in the middle column; the
-//                                   topic strip is inserted immediately
-//                                   after it.
+//   * .MiddleHeader               — group/chat header island in
+//                                   `.messages-layout` (`position: absolute`
+//                                   since WebA #7059). The topic strip is
+//                                   inserted after it and stacked below it.
 //
-//   * MiddleHeaderPanes            — sibling rendered *before* MiddleHeader
-//                                   inside `.messages-layout`. Holds pinned
-//                                   messages, audio player, etc. We reposition
-//                                   it below `#ttopic-strip` via CSS when active.
+//   * MiddleHeaderPanesIsland      — sibling rendered *after* MiddleHeader.
+//                                   Pinned messages etc. We mark it
+//                                   `[data-ttopic-panes-host]` and push it
+//                                   below `#ttopic-strip`.
 //
 // Selectors below intentionally avoid CSS-Modules hashed classes (those
 // look like `lrlHKC_D` / `Foo_bar_xyz12`). The ForumPanel root in the live
@@ -257,28 +258,25 @@
 
   let lastSignature = '';
   let stripResizeObserver = null;
-  let middleColumnObserver = null;
   let observedStrip = null;
 
   function remPx() {
     return HEADER_PANE_GAP_REM * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16);
   }
 
-  function parseCssPx(value) {
-    const n = parseFloat(String(value).trim());
-    return Number.isFinite(n) ? n : 0;
-  }
-
   /**
-   * Layout order: chat header → topic strip → pinned panes → messages.
-   * Strip keeps the 0.5rem header gap; panes are pushed down by CSS.
+   * Panes island is a later absolute sibling of .MiddleHeader (WebA #7059).
+   * Skip our strip and the in-flow .Transition (message list).
    */
   function findHeaderPanesHost(header) {
-    const node = header?.previousElementSibling;
-    if (!node || node.id === STRIP_ID || node.classList.contains('MiddleHeader')) {
-      return null;
+    const layout = header?.closest('.messages-layout');
+    if (!layout) return null;
+    for (const node of layout.children) {
+      if (node === header || node.id === STRIP_ID) continue;
+      if (node.classList.contains('Transition')) continue;
+      if (getComputedStyle(node).position === 'absolute') return node;
     }
-    return node;
+    return null;
   }
 
   function syncStripLayout(strip) {
@@ -289,28 +287,14 @@
     const panesHost = findHeaderPanesHost(header);
 
     if (!strip?.isConnected) {
-      strip?.style.removeProperty('--ttopic-strip-margin-top');
       middleColumn.style.removeProperty('--ttopic-strip-block-height');
-      middleColumn.style.removeProperty('--ttopic-panes-flow-offset');
       panesHost?.removeAttribute('data-ttopic-panes-host');
       return;
     }
 
-    const gapPx = remPx();
-    const panesPx = parseCssPx(
-      getComputedStyle(middleColumn).getPropertyValue('--middle-header-panes-height'),
-    );
-
-    strip.style.setProperty('--ttopic-strip-margin-top', `${gapPx}px`);
-
-    const stripStyle = getComputedStyle(strip);
-    const blockHeight =
-      parseCssPx(stripStyle.marginTop) + strip.offsetHeight + parseCssPx(stripStyle.marginBottom);
-    middleColumn.style.setProperty('--ttopic-strip-block-height', `${blockHeight}px`);
-
     middleColumn.style.setProperty(
-      '--ttopic-panes-flow-offset',
-      `${panesPx > 0 ? panesPx + gapPx : 0}px`,
+      '--ttopic-strip-block-height',
+      `${strip.offsetHeight + remPx()}px`,
     );
 
     if (panesHost) panesHost.setAttribute('data-ttopic-panes-host', '1');
@@ -318,23 +302,12 @@
 
   function observeStripLayout(strip) {
     syncStripLayout(strip);
-    if (observedStrip === strip && stripResizeObserver && middleColumnObserver) return;
+    if (observedStrip === strip && stripResizeObserver) return;
 
     if (stripResizeObserver) stripResizeObserver.disconnect();
     observedStrip = strip;
     stripResizeObserver = new ResizeObserver(() => syncStripLayout(strip));
     stripResizeObserver.observe(strip);
-
-    const middleColumn = document.getElementById('MiddleColumn');
-    if (middleColumnObserver) middleColumnObserver.disconnect();
-    middleColumnObserver = null;
-    if (middleColumn) {
-      middleColumnObserver = new MutationObserver(() => syncStripLayout(strip));
-      middleColumnObserver.observe(middleColumn, {
-        attributes: true,
-        attributeFilter: ['style'],
-      });
-    }
   }
 
   function clearStripLayout() {
@@ -342,15 +315,8 @@
       stripResizeObserver.disconnect();
       stripResizeObserver = null;
     }
-    if (middleColumnObserver) {
-      middleColumnObserver.disconnect();
-      middleColumnObserver = null;
-    }
     observedStrip = null;
-    document.getElementById(STRIP_ID)?.style.removeProperty('--ttopic-strip-margin-top');
-    const middleColumn = document.getElementById('MiddleColumn');
-    middleColumn?.style.removeProperty('--ttopic-strip-block-height');
-    middleColumn?.style.removeProperty('--ttopic-panes-flow-offset');
+    document.getElementById('MiddleColumn')?.style.removeProperty('--ttopic-strip-block-height');
     document.querySelector('[data-ttopic-panes-host]')?.removeAttribute('data-ttopic-panes-host');
   }
 
@@ -371,9 +337,9 @@
       strip.remove();
       return false;
     }
-    // Keep the strip in `.messages-layout` directly after `.MiddleHeader`
-    // (before MessageList). MiddleHeaderPanes is an earlier absolute sibling.
-    if (strip.parentElement !== layout || strip.previousElementSibling !== header) {
+    // Keep the strip in `.messages-layout` after `.MiddleHeader` so it
+    // shares that column's containing block (both are position:absolute).
+    if (strip.parentElement !== layout || header.nextElementSibling !== strip) {
       header.insertAdjacentElement('afterend', strip);
     }
     observeStripLayout(strip);

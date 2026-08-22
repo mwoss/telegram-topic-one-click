@@ -102,13 +102,19 @@ body.ttopic-active #LeftMainHeader .SearchInput--hidden {
   pointer-events: auto !important;
 }
 
-/* The topic strip sits in-flow right after .MiddleHeader. Pinned-message
- * panes (MiddleHeaderPanes) are repositioned below the strip via
- * [data-ttopic-panes-host] — see content.js syncStripLayout(). */
+/* Header + panes are absolute islands (WebA #7059). Sit in that stack:
+ * player → group header → topics → pinned panes. */
 #ttopic-strip {
-  position: relative;
+  position: absolute;
   z-index: var(--z-middle-header, 11);
-  flex-shrink: 0;
+  top: calc(
+    var(--middle-header-player-height, 0px)
+    + var(--middle-header-height, 3rem)
+    + var(--middle-panel-inline-padding, 1rem)
+    + var(--middle-header-gap, 0.5rem)
+  );
+  right: 0;
+  left: 0;
 
   display: flex;
   flex-wrap: nowrap;
@@ -119,9 +125,7 @@ body.ttopic-active #LeftMainHeader .SearchInput--hidden {
   width: calc(100% - var(--middle-panel-inline-padding, 1rem) * 2);
   max-width: calc(var(--messages-container-width, 47.5rem) - var(--middle-panel-inline-padding, 1rem) * 2);
   height: 3rem;
-  /* margin-top synced in content.js to match the 0.5rem header↔pane gap
-   * Telegram uses (see MiddleHeaderPanes.module.scss). */
-  margin: var(--ttopic-strip-margin-top, 0.5rem) auto 0.5rem;
+  margin: 0 auto;
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
   padding-right: max(0.5rem, env(safe-area-inset-right));
@@ -131,7 +135,6 @@ body.ttopic-active #LeftMainHeader .SearchInput--hidden {
   overflow-y: hidden;
   scrollbar-width: none;            /* Firefox */
 
-  /* Match .MiddleHeader / middle-header-pane (pinned bar) island shape. */
   border-radius: 2rem;
   background: var(--color-background, #fff);
   box-shadow: var(--shadow-pane, 0 1px 5px -1px rgba(0, 0, 0, 0.21));
@@ -145,30 +148,30 @@ body.ttopic-active #LeftMainHeader .SearchInput--hidden {
   }
 }
 
-/* Order: chat header → topics → pinned panes. `--ttopic-strip-block-height`
- * already includes the strip's bottom margin (the 0.5rem gap). */
+/* Telegram’s panes-top-base + strip height + trailing gap. */
 body.ttopic-active [data-ttopic-panes-host] {
   top: calc(
-    var(--middle-header-height, 3rem)
+    var(--middle-header-player-height, 0px)
+    + var(--middle-header-height, 3rem)
     + var(--middle-panel-inline-padding, 1rem)
-    + var(--ttopic-strip-block-height, 4rem)
+    + var(--middle-header-gap, 0.5rem)
+    + var(--ttopic-strip-block-height, 3.5rem)
   ) !important;
 }
 
-/* Reserve in-flow space under the strip when pinned panes are open. */
-body.ttopic-active #ttopic-strip + .Transition {
-  margin-top: var(--ttopic-panes-flow-offset, 0px);
-}
-
-/* Panes no longer overlap the message list top — margin above handles it. */
-body.ttopic-active .first-message-date-group {
-  padding-top: 0 !important;
-}
-
-/* MessageList sits below our in-flow strip, which already clears header
- * panes — sticky dates only need Telegram's base inset. */
-body.ttopic-active .MessageList.scrolled:not(.is-animating) .sticky-date {
-  top: 0.625rem !important;
+/* Telegram’s inset is header+panes only — add the strip so messages and
+ * the fade mask clear it. Sticky dates consume --message-list-top-inset. */
+body.ttopic-active .messages-layout .MessageList {
+  --message-list-top-inset: calc(
+    var(--message-list-top-stack)
+    + var(--middle-header-panes-height)
+    + var(--ttopic-strip-block-height, 3.5rem)
+  );
+  --message-list-mask-top-inset: calc(
+    var(--message-list-mask-top-stack)
+    + var(--message-list-mask-panes-height)
+    + var(--ttopic-strip-block-height, 3.5rem)
+  );
 }
 
 #ttopic-strip::-webkit-scrollbar {
